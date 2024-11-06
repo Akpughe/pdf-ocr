@@ -8,8 +8,11 @@ import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
 export async function extractTextFromPDF(fileBuffer: Buffer) {
   const startTime = performance.now();
 
+  // Convert Buffer to Uint8Array
+  const uint8Array = new Uint8Array(fileBuffer);
+
   // Load the PDF document using PDF.js
-  const loadingTask = pdfjsLib.getDocument({ data: fileBuffer });
+  const loadingTask = pdfjsLib.getDocument({ data: uint8Array });
   const pdf = await loadingTask.promise;
 
   // Array to hold promises for parallel page processing
