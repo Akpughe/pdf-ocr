@@ -15,7 +15,6 @@
     "canvas": "^3.0.0-rc2",
     "cors": "^2.8.5",
     "express": "^4.21.1",
-    "gulp": "^5.0.0",
     "multer": "^1.4.5-lts.1",
     "pdfjs-dist": "^3.4.120",
     "tesseract.js": "^4.1.4",
