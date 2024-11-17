@@ -18,7 +18,8 @@ const app = express();
 
 const port = process.env.PORT || 4000;
 
-const redis_url = process.env.REDIS_URL || "redis://localhost:6379";
+const redis_url =
+  process.env.REDIS_URL + '?family=0' || "redis://localhost:6379";
 
 const router = express.Router();
 
