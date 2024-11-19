@@ -16,10 +16,9 @@ import {
 
 const app = express();
 
-const port = process.env.PORT || 4000;
+const port: any = process.env.PORT || 4000;
 
-const redis_url =
-  process.env.REDIS_URL + '?family=0' || "redis://localhost:6379";
+const redis_url = process.env.REDIS_URL || "redis://localhost:6379";
 
 const router = express.Router();
 
@@ -118,7 +117,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   res.status(500).json({ message: "Internal server error" });
 });
 
-app.listen(port, () => {
+app.listen(port, "0.0.0.0", () => {
   console.log(`Server running on http://localhost:${port}`);
   console.log(`BullMQ UI: http://localhost:${port}/admin/queues`);
 });
