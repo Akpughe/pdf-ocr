@@ -60,7 +60,7 @@ async function processPage(pdf: any, pageNum: number) {
 
     try {
       // Load and initialize Tesseract worker
-      await worker.load();
+      // await worker.load();
       await worker.loadLanguage("eng");
       await worker.initialize("eng");
 
