@@ -75,7 +75,14 @@ export async function processTextract(
 
 async function extractTextFromPDF(pdfBuffer: Buffer): Promise<string> {
   try {
-    const pdf = await pdfjsLib.getDocument({ data: pdfBuffer }).promise;
+    // Convert Buffer to Uint8Array
+    const uint8Array = new Uint8Array(
+      pdfBuffer.buffer,
+      pdfBuffer.byteOffset,
+      pdfBuffer.length
+    );
+
+    const pdf = await pdfjsLib.getDocument({ data: uint8Array }).promise;
     let fullText = "";
 
     for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
