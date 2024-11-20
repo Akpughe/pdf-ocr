@@ -14,6 +14,8 @@ import {
   getTranscriptFromVideo,
 } from "./src/ytExtraction";
 
+import { processTextract } from "./src/textract";
+
 const app = express();
 
 const port: any = process.env.PORT || 4000;
@@ -93,6 +95,29 @@ app.post(
   }
 );
 
+export async function textractController(req: Request, res: Response) {
+  if (!req.file) {
+    return res.status(400).json({ message: "No file uploaded" });
+  }
+
+  try {
+    const result = await processTextract(req.file.buffer);
+
+    res.status(200).json({
+      text: result.text,
+      rawBlocks: result.rawBlocks,
+    });
+  } catch (error) {
+    console.error("Textract Route Error:", error);
+    res.status(500).json({
+      message: "Failed to process document with Textract",
+      error: error instanceof Error ? error.message : "Unknown error",
+    });
+  }
+}
+// @ts-ignore
+app.post("/textract", upload.single("document"), textractController);
+
 app.post("/yt-ocr", async (req: Request, res: Response) => {
   const { url } = req.body;
 
@@ -117,7 +142,7 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   res.status(500).json({ message: "Internal server error" });
 });
 
-app.listen(port, "0.0.0.0", () => {
+app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
   console.log(`BullMQ UI: http://localhost:${port}/admin/queues`);
 });
