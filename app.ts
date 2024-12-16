@@ -15,6 +15,7 @@ import {
 } from "./src/ytExtraction";
 
 import { processTextract } from "./src/textract";
+import { setupSpeechRecognitionRoute } from "./src/speech-text";
 
 const app = express();
 
@@ -135,6 +136,8 @@ app.post("/yt-ocr", async (req: Request, res: Response) => {
       .json({ message: "Failed to get transcript from YouTube video" });
   }
 });
+
+setupSpeechRecognitionRoute(app);
 
 // catch errors
 app.use((err: any, req: Request, res: Response, next: NextFunction) => {
