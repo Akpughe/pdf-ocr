@@ -6,6 +6,8 @@ import fs from "fs";
 import path from "path";
 import { exec } from "child_process";
 import util from "util";
+// @ts-ignore
+import { convertAndSaveAudio } from "light-audio-converter";
 
 // Load environment variables
 dotenv.config();
@@ -17,26 +19,60 @@ const execPromise = util.promisify(exec);
  * @param inputPath Path to the input audio file
  * @returns Path to the converted MP3 file
  */
-export async function convertToMp3(inputPath: string): Promise<string> {
-  // Generate output path for MP3
-  const outputPath = path.join(
-    path.dirname(inputPath),
+// export async function convertToMp3(inputPath: string): Promise<string> {
+//   // Generate output path for MP3
+//   const outputPath = path.join(
+//     path.dirname(inputPath),
+//     `converted-${Date.now()}.mp3`
+//   );
+
+//   try {
+//     // Use FFmpeg to convert to MP3
+//     await execPromise(
+//       `ffmpeg -i "${inputPath}" -acodec libmp3lame -b:a 128k "${outputPath}"`
+//     );
+
+//     // Optional: Remove original file
+//     fs.unlinkSync(inputPath);
+
+//     return outputPath;
+//   } catch (error) {
+//     console.error("Conversion error:", error);
+//     throw new Error("Failed to convert audio file to MP3");
+//   }
+// }
+
+export async function convertAudioToMp3(
+  inputFilePath: string
+): Promise<string> {
+  // Check if the file is already an MP3
+  if (path.extname(inputFilePath).toLowerCase() === ".mp3") {
+    return inputFilePath; // No conversion needed
+  }
+
+  // Generate output file path
+  const outputFilePath = path.join(
+    path.dirname(inputFilePath),
     `converted-${Date.now()}.mp3`
   );
 
   try {
-    // Use FFmpeg to convert to MP3
-    await execPromise(
-      `ffmpeg -i "${inputPath}" -acodec libmp3lame -b:a 128k "${outputPath}"`
+    // Perform conversion using light-audio-converter
+    const result = await convertAndSaveAudio(
+      inputFilePath,
+      "mp3",
+      outputFilePath
     );
 
-    // Optional: Remove original file
-    fs.unlinkSync(inputPath);
+    console.log("Audio converted successfully:", result.data);
 
-    return outputPath;
+    // Optionally delete the original file
+    fs.unlinkSync(inputFilePath);
+
+    return outputFilePath;
   } catch (error) {
-    console.error("Conversion error:", error);
-    throw new Error("Failed to convert audio file to MP3");
+    console.error("Audio conversion failed:", error);
+    throw new Error("Failed to convert audio to MP3 format.");
   }
 }
 
@@ -99,11 +135,11 @@ export const speechRecognitionController = async (
 
   try {
     // Convert file to MP3 if not already
-    if (!isMP3File(finalAudioPath)) {
-      finalAudioPath = await convertToMp3(finalAudioPath);
-    }
 
-    const DEEPINFRA_API_KEY = process.env.DEEPINFRA_TOKEN;
+    finalAudioPath = await convertAudioToMp3(finalAudioPath);
+
+    const DEEPINFRA_API_KEY =
+      process.env.DEEPINFRA_TOKEN || "IffddRCm3zn4A58ddmRpSR39oIU7foiw";
     const MODEL = "openai/whisper-large-v3-turbo";
 
     if (!DEEPINFRA_API_KEY) {
