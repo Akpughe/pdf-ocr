@@ -24,7 +24,7 @@ const app = express();
 
 const port: any = process.env.PORT || 4000;
 
-export const redis_url = process.env.REDIS_URL || "redis://localhost:6379";
+export const redis_url = process.env.REDIS_URL!;
 
 const router = express.Router();
 
