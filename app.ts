@@ -17,11 +17,14 @@ import {
 import { processTextract } from "./src/textract";
 import { setupSpeechRecognitionRoute } from "./src/speech-text";
 
+import { uploadProcess } from "./src/worker/pdf-upload";
+import { initUpload } from "./src/job/upload";
+
 const app = express();
 
 const port: any = process.env.PORT || 4000;
 
-const redis_url = process.env.REDIS_URL || "redis://localhost:6379";
+export const redis_url = process.env.REDIS_URL || "redis://localhost:6379";
 
 const router = express.Router();
 
@@ -35,11 +38,18 @@ export const subscriptionQueue = new Queue("subscription-queue", {
   connection,
 });
 
+export const fileUploadQueue = new Queue("file-upload-queue", {
+  connection,
+});
+
 const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath("/admin/queues");
 
+const subscriptionQueueAdapter = new BullMQAdapter(subscriptionQueue);
+const fileUploadQueueAdapter = new BullMQAdapter(fileUploadQueue);
+
 const { addQueue, removeQueue, setQueues, replaceQueues } = createBullBoard({
-  queues: [new BullMQAdapter(subscriptionQueue)],
+  queues: [subscriptionQueueAdapter, fileUploadQueueAdapter],
   serverAdapter,
 });
 
@@ -66,13 +76,24 @@ app.use((req, res, next) => {
 });
 
 // Multer setup to store files in memory (buffer)
-const storage = multer.memoryStorage();
+// const storage = multer.memoryStorage();
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, "uploads/");
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}-${file.originalname}`);
+  },
+});
 const upload = multer({ storage });
 const uploadMiddleware = util.promisify(upload.single("pdfFile"));
 
 app.get("/", (req: Request, res: Response) => {
   res.send("Hello World");
 });
+
+// Endpoint to trigger file upload
+app.post("/upload", upload.single("file"), initUpload);
 
 // POST endpoint to upload a PDF
 app.post(
@@ -148,4 +169,12 @@ app.use((err: any, req: Request, res: Response, next: NextFunction) => {
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
   console.log(`BullMQ UI: http://localhost:${port}/admin/queues`);
+});
+
+uploadProcess.on("completed", (job: any) => {
+  console.log(`Job ${job.id} has completed!`);
+});
+
+uploadProcess.on("failed", (job: any, err) => {
+  console.error(`Job ${job.id} has failed with error ${err.message}`);
 });
