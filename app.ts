@@ -10,6 +10,7 @@ import { Queue } from "bullmq";
 import IORedis from "ioredis";
 import dotenv from "dotenv";
 import {
+  checkVideoDuration,
   formatYouTubeLinkAndGetID,
   getTranscriptFromVideo,
 } from "./src/ytExtraction";
@@ -159,6 +160,26 @@ app.post("/yt-ocr", async (req: Request, res: Response, next: NextFunction) => {
     //   .json({ message: "Failed to get transcript from YouTube video" });
   }
 });
+
+app.post(
+  "/yt-video-duration",
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { url } = req.body;
+
+    try {
+      const { formattedUrl } = formatYouTubeLinkAndGetID(url);
+
+      const duration = await checkVideoDuration(formattedUrl);
+
+      res.status(200).json({ duration });
+    } catch (error) {
+      next(error);
+      // res
+      //   .status(500)
+      //   .json({ message: "Failed to get transcript from YouTube video" });
+    }
+  }
+);
 
 setupSpeechRecognitionRoute(app);
 

@@ -22,6 +22,8 @@ export async function getTranscriptFromVideo(url: string) {
   const transcript = video?.captions?.caption_tracks?.[0];
   const title = video?.basic_info.title;
 
+  console.log("video info:", video);
+
   if (!transcript) {
     throw new CustomError("No transcript available for this video", 400);
     // console.log("No transcript available for this video.");
@@ -50,6 +52,26 @@ export async function getTranscriptFromVideo(url: string) {
 
   return { title, transcriptText };
 }
+
+export const checkVideoDuration = async (url: string) => {
+  const youtube = await Innertube.create({
+    lang: "en",
+    location: "US",
+    retrieve_player: false,
+  });
+
+  // Extract video ID from the URL
+  const videoId = new URL(url).searchParams.get("v");
+
+  if (!videoId) {
+    throw new Error("Invalid YouTube URL");
+  }
+
+  const video = await youtube.getInfo(videoId);
+  const duration = video?.basic_info?.duration;
+
+  return duration;
+};
 
 export function formatYouTubeLinkAndGetID(shortUrl: string): {
   formattedUrl: string;
