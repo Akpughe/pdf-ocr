@@ -1,6 +1,7 @@
 import { Innertube } from "youtubei.js";
 import axios from "axios";
 import { parseStringPromise } from "xml2js";
+import CustomError from "./helpers/custom-error";
 
 export async function getTranscriptFromVideo(url: string) {
   const youtube = await Innertube.create({
@@ -22,8 +23,11 @@ export async function getTranscriptFromVideo(url: string) {
   const title = video?.basic_info.title;
 
   if (!transcript) {
-    console.log("No transcript available for this video.");
-    return;
+    throw new CustomError("No transcript available for this video", 400);
+    // console.log("No transcript available for this video.");
+    // throw new Error("No transcript available for this video.");
+
+    // return;
   }
 
   // Fetch the transcript from the base URL
