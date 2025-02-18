@@ -10,6 +10,7 @@ import { Queue } from "bullmq";
 import IORedis from "ioredis";
 import dotenv from "dotenv";
 import {
+  checkVideoDuration,
   formatYouTubeLinkAndGetID,
   getTranscriptFromVideo,
 } from "./src/ytExtraction";
@@ -19,6 +20,7 @@ import { setupSpeechRecognitionRoute } from "./src/speech-text";
 
 import { uploadProcess } from "./src/worker/pdf-upload";
 import { initUpload } from "./src/job/upload";
+import { globalErrorHandler } from "./src/helpers/error-handler";
 
 const app = express();
 
@@ -140,7 +142,7 @@ export async function textractController(req: Request, res: Response) {
 // @ts-ignore
 app.post("/textract", upload.single("document"), textractController);
 
-app.post("/yt-ocr", async (req: Request, res: Response) => {
+app.post("/yt-ocr", async (req: Request, res: Response, next: NextFunction) => {
   const { url } = req.body;
 
   try {
@@ -152,19 +154,43 @@ app.post("/yt-ocr", async (req: Request, res: Response) => {
       .status(200)
       .json({ title: transcript?.title, text: transcript?.transcriptText });
   } catch (error) {
-    res
-      .status(500)
-      .json({ message: "Failed to get transcript from YouTube video" });
+    next(error);
+    // res
+    //   .status(500)
+    //   .json({ message: "Failed to get transcript from YouTube video" });
   }
 });
+
+app.post(
+  "/yt-video-duration",
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { url } = req.body;
+
+    try {
+      const { formattedUrl } = formatYouTubeLinkAndGetID(url);
+
+      const duration = await checkVideoDuration(formattedUrl);
+
+      res.status(200).json({ duration });
+    } catch (error) {
+      next(error);
+      // res
+      //   .status(500)
+      //   .json({ message: "Failed to get transcript from YouTube video" });
+    }
+  }
+);
 
 setupSpeechRecognitionRoute(app);
 
 // catch errors
-app.use((err: any, req: Request, res: Response, next: NextFunction) => {
-  console.error(err);
-  res.status(500).json({ message: "Internal server error" });
-});
+// app.use((err: any, req: Request, res: Response, next: NextFunction) => {
+//   console.error(err);
+//   res.status(500).json({ message: "Internal server error" });
+// });
+
+// @ts-ignore
+app.use(globalErrorHandler);
 
 app.listen(port, () => {
   console.log(`Server running on http://localhost:${port}`);
