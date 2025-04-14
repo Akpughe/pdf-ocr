@@ -13,6 +13,7 @@ import {
   checkVideoDuration,
   formatYouTubeLinkAndGetID,
   getTranscriptFromVideo,
+  getVideoTitle,
 } from "./src/ytExtraction";
 
 import { processTextract } from "./src/textract";
@@ -177,6 +178,23 @@ app.post(
       // res
       //   .status(500)
       //   .json({ message: "Failed to get transcript from YouTube video" });
+    }
+  }
+);
+
+app.post(
+  "/yt-video-title",
+  async (req: Request, res: Response, next: NextFunction) => {
+    const { url } = req.body;
+
+    try {
+      const { formattedUrl } = formatYouTubeLinkAndGetID(url);
+
+      const result = await getVideoTitle(formattedUrl);
+
+      res.status(200).json({ title: result.title });
+    } catch (error) {
+      next(error);
     }
   }
 );
