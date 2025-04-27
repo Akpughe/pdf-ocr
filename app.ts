@@ -22,6 +22,10 @@ import { setupSpeechRecognitionRoute } from "./src/speech-text";
 import { uploadProcess } from "./src/worker/pdf-upload";
 import { initUpload } from "./src/job/upload";
 import { globalErrorHandler } from "./src/helpers/error-handler";
+import {
+  expirationWorker,
+  cancellationWorker,
+} from "./src/worker/subscription";
 
 const app = express();
 
@@ -41,6 +45,20 @@ export const subscriptionQueue = new Queue("subscription-queue", {
   connection,
 });
 
+export const subscriptionExpirationQueue = new Queue(
+  "subscription-expiration-queue",
+  {
+    connection,
+  }
+);
+
+export const subscriptionCancellationQueue = new Queue(
+  "subscription-cancellation-queue",
+  {
+    connection,
+  }
+);
+
 export const fileUploadQueue = new Queue("file-upload-queue", {
   connection,
 });
@@ -49,10 +67,20 @@ const serverAdapter = new ExpressAdapter();
 serverAdapter.setBasePath("/admin/queues");
 
 const subscriptionQueueAdapter = new BullMQAdapter(subscriptionQueue);
-const fileUploadQueueAdapter = new BullMQAdapter(fileUploadQueue);
+const subscriptionExpirationQueueAdapter = new BullMQAdapter(
+  subscriptionExpirationQueue
+);
+const subscriptionCancellationQueueAdapter = new BullMQAdapter(
+  subscriptionCancellationQueue
+);
+// const fileUploadQueueAdapter = new BullMQAdapter(fileUploadQueue);
 
 const { addQueue, removeQueue, setQueues, replaceQueues } = createBullBoard({
-  queues: [subscriptionQueueAdapter, fileUploadQueueAdapter],
+  queues: [
+    subscriptionQueueAdapter,
+    subscriptionExpirationQueueAdapter,
+    subscriptionCancellationQueueAdapter,
+  ],
   serverAdapter,
 });
 
@@ -220,5 +248,21 @@ uploadProcess.on("completed", (job: any) => {
 });
 
 uploadProcess.on("failed", (job: any, err) => {
+  console.error(`Job ${job.id} has failed with error ${err.message}`);
+});
+
+expirationWorker.on("completed", (job: any) => {
+  console.log(`Job ${job.id} has completed!`);
+});
+
+cancellationWorker.on("completed", (job: any) => {
+  console.log(`Job ${job.id} has completed!`);
+});
+
+expirationWorker.on("failed", (job: any, err) => {
+  console.error(`Job ${job.id} has failed with error ${err.message}`);
+});
+
+cancellationWorker.on("failed", (job: any, err) => {
   console.error(`Job ${job.id} has failed with error ${err.message}`);
 });
