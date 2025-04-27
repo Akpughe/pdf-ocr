@@ -4,6 +4,7 @@ import IORedis from "ioredis";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import axios from "axios";
+import Stripe from "stripe";
 
 dotenv.config();
 
@@ -18,6 +19,7 @@ if (!supabaseUrl || !supabaseAnonKey || !paystackSecret) {
 }
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 
 const redisConnection = new IORedis(redis_url, {
   maxRetriesPerRequest: null,
@@ -61,6 +63,40 @@ async function cancelPaystackSubscription(user_id: string) {
   }
 }
 
+async function cancelStripeSubscription(user_id: string) {
+  try {
+    // Get subscription details from Supabase
+    const { data: subscriptionData } = await supabase
+      .from("subscriptions")
+      .select("stripe_sub_code, subscription_end_date")
+      .eq("user_id", user_id)
+      .single();
+
+    if (subscriptionData?.stripe_sub_code) {
+      // Cancel the subscription in Stripe
+      const subscription = await stripe.subscriptions.cancel(
+        subscriptionData.stripe_sub_code
+      );
+      console.log("Stripe subscription cancellation response:", subscription);
+
+      // Update subscription status in Supabase
+      await supabase
+        .from("subscriptions")
+        .update({
+          subscription_status: "cancelling",
+          cancellation_date: new Date().toISOString(),
+        })
+        .eq("user_id", user_id);
+
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("Stripe subscription cancellation error:", error);
+    return false;
+  }
+}
+
 // Worker to handle subscription expirations
 const expirationWorker = new Worker(
   "subscription-expiration-queue",
@@ -79,6 +115,13 @@ const expirationWorker = new Worker(
         throw new Error("Free plan not found");
       }
 
+      // get subscription status from supabase
+      const { data: subscriptionData } = await supabase
+        .from("subscriptions")
+        .select("subscription_status, payment_platform")
+        .eq("user_id", user_id)
+        .single();
+
       // Update subscription status to expired and set to free plan
       await supabase
         .from("subscriptions")
@@ -90,7 +133,11 @@ const expirationWorker = new Worker(
         .eq("user_id", user_id);
 
       // Cancel Paystack subscription last
-      await cancelPaystackSubscription(user_id);
+
+      // await cancelPaystackSubscription(user_id);
+      // if (subscriptionData?.payment_platform === "paystack") {
+      //   await cancelPaystackSubscription(user_id);
+      // }
 
       return { success: true };
     } catch (error) {
