@@ -31,7 +31,9 @@ const app = express();
 
 const port: any = process.env.PORT || 4000;
 
-export const redis_url = process.env.REDIS_URL!;
+export const redis_url =
+  process.env.REDIS_URL! ||
+  "redis://default:IHPqwCWRTmReCJlAHVHBfqJNIutHLTkE@junction.proxy.rlwy.net:22103";
 
 const router = express.Router();
 
