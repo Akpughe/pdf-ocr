@@ -24,6 +24,22 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
 const redisConnection = new IORedis(redis_url, {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
+  retryStrategy: (times: number) => {
+    const delay = Math.min(times * 50, 2000);
+    return delay;
+  },
+  connectTimeout: 10000,
+  lazyConnect: true,
+});
+
+console.log("Subscription Worker - Using Redis URL:", redis_url);
+
+redisConnection.on("error", (error: Error) => {
+  console.error("Subscription Worker - Redis Connection Error:", error);
+});
+
+redisConnection.on("connect", () => {
+  console.log("Subscription Worker - Successfully connected to Redis");
 });
 
 // Function to cancel Paystack subscription
@@ -145,7 +161,12 @@ const expirationWorker = new Worker(
       throw error;
     }
   },
-  { connection: redisConnection }
+  {
+    connection: redisConnection,
+    prefix: "subscription",
+    concurrency: 1,
+    autorun: true,
+  }
 );
 
 // Worker to handle subscription cancellations
@@ -188,16 +209,21 @@ const cancellationWorker = new Worker(
       throw error;
     }
   },
-  { connection: redisConnection }
+  {
+    connection: redisConnection,
+    prefix: "subscription",
+    concurrency: 1,
+    autorun: true,
+  }
 );
 
-// Handle worker errors properly
-// expirationWorker.on("error", (error: Error) => {
-//   console.error("Expiration worker error:", error);
-// });
+// Uncomment and update the error handlers
+expirationWorker.on("error", (error: Error) => {
+  console.error("Expiration worker error:", error);
+});
 
-// cancellationWorker.on("error", (error: Error) => {
-//   console.error("Cancellation worker error:", error);
-// });
+cancellationWorker.on("error", (error: Error) => {
+  console.error("Cancellation worker error:", error);
+});
 
 export { expirationWorker, cancellationWorker };

@@ -27,20 +27,37 @@ import {
   cancellationWorker,
 } from "./src/worker/subscription";
 
+// Load environment variables first
+dotenv.config();
+
 const app = express();
 
 const port: any = process.env.PORT || 4000;
 
+// Initialize Redis connection
 export const redis_url =
   process.env.REDIS_URL! ||
   "redis://default:IHPqwCWRTmReCJlAHVHBfqJNIutHLTkE@junction.proxy.rlwy.net:22103";
+console.log(`Using Redis URL: ${redis_url}`);
 
-const router = express.Router();
-
-// Redis connection
+// Create Redis connection with full configuration
 export const connection = new IORedis(redis_url, {
   maxRetriesPerRequest: null,
   enableReadyCheck: false,
+  retryStrategy: (times: number) => {
+    const delay = Math.min(times * 50, 2000);
+    return delay;
+  },
+  connectTimeout: 10000,
+  lazyConnect: true,
+});
+
+connection.on("error", (error: Error) => {
+  console.error("Main App - Redis Connection Error:", error);
+});
+
+connection.on("connect", () => {
+  console.log("Main App - Successfully connected to Redis");
 });
 
 export const subscriptionQueue = new Queue("subscription-queue", {
@@ -245,13 +262,13 @@ app.listen(port, () => {
   console.log(`BullMQ UI: http://localhost:${port}/admin/queues`);
 });
 
-uploadProcess.on("completed", (job: any) => {
-  console.log(`Job ${job.id} has completed!`);
-});
+// uploadProcess.on("completed", (job: any) => {
+//   console.log(`Job ${job.id} has completed!`);
+// });
 
-uploadProcess.on("failed", (job: any, err) => {
-  console.error(`Job ${job.id} has failed with error ${err.message}`);
-});
+// uploadProcess.on("failed", (job: any, err) => {
+//   console.error(`Job ${job.id} has failed with error ${err.message}`);
+// });
 
 expirationWorker.on("completed", (job: any) => {
   console.log(`Job ${job.id} has completed!`);
