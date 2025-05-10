@@ -103,3 +103,37 @@ export function formatYouTubeLinkAndGetID(shortUrl: string): {
     throw new Error("Invalid URL");
   }
 }
+
+export async function getVideoTitle(url: string) {
+  const youtube = await Innertube.create({
+    lang: "en",
+    location: "US",
+    retrieve_player: false,
+  });
+
+  // Extract video ID from the URL
+  let videoId: string | null = null;
+  if (url.includes("youtu.be/")) {
+    videoId = url.split("youtu.be/")[1].split("?")[0].split("&")[0];
+  } else if (url.includes("youtube.com/watch?v=")) {
+    videoId = url.split("watch?v=")[1].split("&")[0];
+  } else if (url.includes("youtube.com/v/")) {
+    videoId = url.split("/v/")[1].split("?")[0].split("&")[0];
+  } else if (url.includes("youtube.com/embed/")) {
+    videoId = url.split("/embed/")[1].split("?")[0].split("&")[0];
+  }
+
+  if (!videoId) {
+    throw new Error("Invalid YouTube URL");
+  }
+
+  // Get the video information
+  const video = await youtube.getInfo(videoId);
+  const title = video?.basic_info.title;
+
+  if (!title) {
+    throw new CustomError("Could not retrieve video title", 400);
+  }
+
+  return { title };
+}
