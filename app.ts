@@ -7,7 +7,6 @@ import { createBullBoard } from "@bull-board/api";
 import { BullMQAdapter } from "@bull-board/api/bullMQAdapter";
 import { ExpressAdapter } from "@bull-board/express";
 import { Queue } from "bullmq";
-import IORedis from "ioredis";
 import dotenv from "dotenv";
 import {
   checkVideoDuration,
@@ -18,7 +17,6 @@ import {
 
 import { processTextract } from "./src/textract";
 import { setupSpeechRecognitionRoute } from "./src/speech-text";
-
 import { uploadProcess } from "./src/worker/pdf-upload";
 import { initUpload } from "./src/job/upload";
 import { globalErrorHandler } from "./src/helpers/error-handler";
@@ -26,41 +24,34 @@ import {
   expirationWorker,
   cancellationWorker,
 } from "./src/worker/subscription";
+import { redisConnection } from "./src/config/redis";
+
+// Load environment variables first
+dotenv.config();
 
 const app = express();
-
 const port: any = process.env.PORT || 4000;
 
-export const redis_url = process.env.REDIS_URL!;
-
-const router = express.Router();
-
-// Redis connection
-export const connection = new IORedis(redis_url, {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-});
-
 export const subscriptionQueue = new Queue("subscription-queue", {
-  connection,
+  connection: redisConnection,
 });
 
 export const subscriptionExpirationQueue = new Queue(
   "subscription-expiration-queue",
   {
-    connection,
+    connection: redisConnection,
   }
 );
 
 export const subscriptionCancellationQueue = new Queue(
   "subscription-cancellation-queue",
   {
-    connection,
+    connection: redisConnection,
   }
 );
 
 export const fileUploadQueue = new Queue("file-upload-queue", {
-  connection,
+  connection: redisConnection,
 });
 
 const serverAdapter = new ExpressAdapter();
@@ -127,49 +118,49 @@ app.get("/", (req: Request, res: Response) => {
 app.post("/upload", upload.single("file"), initUpload);
 
 // POST endpoint to upload a PDF
-app.post(
-  "/ocr-pdf",
-  upload.single("pdfFile"),
-  async (req: Request, res: Response): Promise<void> => {
-    if (!req.file) {
-      res.status(400).json({ message: "No file uploaded" });
-      return;
-    }
+// app.post(
+//   "/ocr-pdf",
+//   upload.single("pdfFile"),
+//   async (req: Request, res: Response): Promise<void> => {
+//     if (!req.file) {
+//       res.status(400).json({ message: "No file uploaded" });
+//       return;
+//     }
 
-    try {
-      const fileBuffer = req.file?.buffer;
+//     try {
+//       const fileBuffer = req.file?.buffer;
 
-      const text = await extractTextFromPDF(fileBuffer);
-      res.status(200).json({ text: text });
-    } catch (error) {
-      console.error("Error extracting text:", error);
-      res.status(500).json({ message: "Failed to extract text from PDF" });
-    }
-  }
-);
+//       const text = await extractTextFromPDF(fileBuffer);
+//       res.status(200).json({ text: text });
+//     } catch (error) {
+//       console.error("Error extracting text:", error);
+//       res.status(500).json({ message: "Failed to extract text from PDF" });
+//     }
+//   }
+// );
 
-export async function textractController(req: Request, res: Response) {
-  if (!req.file) {
-    return res.status(400).json({ message: "No file uploaded" });
-  }
+// export async function textractController(req: Request, res: Response) {
+//   if (!req.file) {
+//     return res.status(400).json({ message: "No file uploaded" });
+//   }
 
-  try {
-    const result = await processTextract(req.file.buffer);
+//   try {
+//     const result = await processTextract(req.file.buffer);
 
-    res.status(200).json({
-      text: result.text,
-      rawBlocks: result.rawBlocks,
-    });
-  } catch (error) {
-    console.error("Textract Route Error:", error);
-    res.status(500).json({
-      message: "Failed to process document with Textract",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
-  }
-}
+//     res.status(200).json({
+//       text: result.text,
+//       rawBlocks: result.rawBlocks,
+//     });
+//   } catch (error) {
+//     console.error("Textract Route Error:", error);
+//     res.status(500).json({
+//       message: "Failed to process document with Textract",
+//       error: error instanceof Error ? error.message : "Unknown error",
+//     });
+//   }
+// }
 // @ts-ignore
-app.post("/textract", upload.single("document"), textractController);
+// app.post("/textract", upload.single("document"), textractController);
 
 app.post("/yt-ocr", async (req: Request, res: Response, next: NextFunction) => {
   const { url } = req.body;
@@ -243,13 +234,13 @@ app.listen(port, () => {
   console.log(`BullMQ UI: http://localhost:${port}/admin/queues`);
 });
 
-uploadProcess.on("completed", (job: any) => {
-  console.log(`Job ${job.id} has completed!`);
-});
+// uploadProcess.on("completed", (job: any) => {
+//   console.log(`Job ${job.id} has completed!`);
+// });
 
-uploadProcess.on("failed", (job: any, err) => {
-  console.error(`Job ${job.id} has failed with error ${err.message}`);
-});
+// uploadProcess.on("failed", (job: any, err) => {
+//   console.error(`Job ${job.id} has failed with error ${err.message}`);
+// });
 
 expirationWorker.on("completed", (job: any) => {
   console.log(`Job ${job.id} has completed!`);

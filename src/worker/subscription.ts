@@ -1,16 +1,17 @@
 import { Worker, Job } from "bullmq";
-import { redis_url } from "../../app";
-import IORedis from "ioredis";
 import { createClient } from "@supabase/supabase-js";
 import dotenv from "dotenv";
 import axios from "axios";
 import Stripe from "stripe";
+import { redisConnection } from "../config/redis";
 
 dotenv.config();
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 const paystackSecret = process.env.PAYSTACK_SECRET_KEY!;
+
+console.log("Redis URL:", redisConnection.options.host);
 
 if (!supabaseUrl || !supabaseAnonKey || !paystackSecret) {
   throw new Error(
@@ -20,11 +21,6 @@ if (!supabaseUrl || !supabaseAnonKey || !paystackSecret) {
 
 const supabase = createClient(supabaseUrl, supabaseAnonKey);
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string);
-
-const redisConnection = new IORedis(redis_url, {
-  maxRetriesPerRequest: null,
-  enableReadyCheck: false,
-});
 
 // Function to cancel Paystack subscription
 async function cancelPaystackSubscription(user_id: string) {
@@ -145,7 +141,12 @@ const expirationWorker = new Worker(
       throw error;
     }
   },
-  { connection: redisConnection }
+  {
+    connection: redisConnection,
+    prefix: "subscription",
+    concurrency: 1,
+    autorun: true,
+  }
 );
 
 // Worker to handle subscription cancellations
@@ -188,16 +189,60 @@ const cancellationWorker = new Worker(
       throw error;
     }
   },
-  { connection: redisConnection }
+  {
+    connection: redisConnection,
+    prefix: "subscription",
+    concurrency: 1,
+    autorun: true,
+  }
 );
 
-// Handle worker errors properly
-// expirationWorker.on("error", (error: Error) => {
-//   console.error("Expiration worker error:", error);
-// });
+// Worker status logging
+expirationWorker.on("ready", () => {
+  console.log("🟢 Subscription Expiration Worker is ready");
+});
 
-// cancellationWorker.on("error", (error: Error) => {
-//   console.error("Cancellation worker error:", error);
-// });
+expirationWorker.on("active", (job) => {
+  console.log(`📝 Subscription Expiration Worker processing job ${job.id}`);
+});
+
+expirationWorker.on("completed", (job) => {
+  console.log(`✅ Subscription Expiration Worker completed job ${job.id}`);
+});
+
+expirationWorker.on("failed", (job, error) => {
+  console.error(
+    `❌ Subscription Expiration Worker failed job ${job?.id}:`,
+    error
+  );
+});
+
+expirationWorker.on("error", (error: Error) => {
+  console.error("⚠️ Subscription Expiration Worker error:", error);
+});
+
+// Cancellation worker status logging
+cancellationWorker.on("ready", () => {
+  console.log("🟢 Subscription Cancellation Worker is ready");
+});
+
+cancellationWorker.on("active", (job) => {
+  console.log(`📝 Subscription Cancellation Worker processing job ${job.id}`);
+});
+
+cancellationWorker.on("completed", (job) => {
+  console.log(`✅ Subscription Cancellation Worker completed job ${job.id}`);
+});
+
+cancellationWorker.on("failed", (job, error) => {
+  console.error(
+    `❌ Subscription Cancellation Worker failed job ${job?.id}:`,
+    error
+  );
+});
+
+cancellationWorker.on("error", (error: Error) => {
+  console.error("⚠️ Subscription Cancellation Worker error:", error);
+});
 
 export { expirationWorker, cancellationWorker };
